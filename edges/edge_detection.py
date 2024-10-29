@@ -33,7 +33,7 @@ image_blur = cv2.GaussianBlur(image, (5, 5), 1)
 cv2_imshow(image_blur, "Blur")
 
 
-# Sobel operator
+# Sobel operators
 Kv = np.array(
     [
         [-1, 0, 1],
@@ -44,8 +44,8 @@ Kv = np.array(
 Ku = Kv.T
 
 # Convolution
-Iu = cv2.filter2D(image_blur, -1, Ku)
-Iv = cv2.filter2D(image_blur, -1, Kv)
+Iu = cv2.filter2D(image_blur, -1, Ku) # Horizontal gradient
+Iv = cv2.filter2D(image_blur, -1, Kv) # Vertical gradient
 
 cv2_imshow(Iu, "Iu")
 cv2_imshow(Iv, "Iv")
@@ -55,3 +55,7 @@ I = np.sqrt(np.square(Iu) + np.square(Iv))
 I = (I/I.max()*255).astype('uint8')
 
 cv2_imshow(I, "I")
+
+cv2.imwrite(dir_path + '/penguins_edges_vertical.png', Iu)
+cv2.imwrite(dir_path + '/penguins_edges_horizontal.png', Iv)
+cv2.imwrite(dir_path + '/penguins_edges.png', I)
