@@ -10,7 +10,7 @@ def cv2_imshow(img):
     plt.axis('off')
     plt.show()
 
-
+# Reading image
 dir_path = os.path.dirname(os.path.realpath(__file__))
 image_path = dir_path + "\\lena.pgm"
 
@@ -26,16 +26,20 @@ cv2_imshow(img_norm)
 # Changing brightness
 img_bright = np.clip(img_norm + 0.25, 0, 1)
 cv2_imshow(img_bright)
+cv2.imwrite(dir_path + "\\lena_bright.jpg", img_bright)
 
 # Changing contrast
 img_contrast = np.clip(img_norm * 2, 0, 1)
 cv2_imshow(img_contrast)
+cv2.imwrite(dir_path + "\\lena_contrast.jpg", img_contrast)
 
 # Negative image
 img_neg = 1 - img_norm
 cv2_imshow(img_neg)
+cv2.imwrite(dir_path + "\\lena_neg.jpg", img_neg)
 
 # Posterisation
 N = 4
 img_post = np.floor(img_norm * N) / N
 cv2_imshow(img_post)
+cv2.imwrite(dir_path + "\\lena_post.jpg", img_post)
