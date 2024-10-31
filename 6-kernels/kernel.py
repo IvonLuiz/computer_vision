@@ -48,3 +48,17 @@ plt.title("Gaussian Kernel")
 plt.colorbar()
 plt.axis('off')
 plt.show()
+
+# 5 - Apply Gaussian blur
+im_g = cv2.filter2D(img_gray, -1, KG)
+cv2.imshow("blur_cv2", im_g)
+cv2.waitKey(0)
+
+# Gaussian blur direct implementation
+# im_g = cv2.GaussianBlur(img_gray, (17, 17), 5)
+
+# 6 - Show image
+cv2.imshow("Image with uniform filter", im_u)
+cv2.waitKey(0)
+cv2.imshow("Image with Gaussian filter", im_g)
+cv2.waitKey(0)
