@@ -36,7 +36,7 @@ def kgauss(sigma, half_width):
     ax = np.arange(-half_width, half_width + 1) # -half_width to half_width around center pixel
     xx, yy = np.meshgrid(ax, ax)    # 2D grid for kernel
     kernel = np.exp(-(xx**2 + yy**2) / (2. * sigma**2))
-    kernel /= kernel.sum()  # Normaliza para volume unitário
+    kernel /= kernel.sum()  # Normalize 
 
     return kernel
 
