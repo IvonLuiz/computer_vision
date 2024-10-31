@@ -14,17 +14,18 @@ cv2.imshow("Image gray double", img_gray)
 cv2.waitKey(0)
 
 # 2 - Make 15x15 kernel with volume one
-Ku = np.ones((15, 15), np.float32) / (15 * 15)
+kU = np.ones((15, 15), np.float32) / (15 * 15)
 
 plt.figure(figsize=(6, 6))
-plt.imshow(Ku, cmap='gray', interpolation='nearest')
+plt.imshow(kU, cmap='gray', interpolation='nearest')
 plt.title("15x15 Uniform Kernel")
 plt.colorbar()
 plt.axis('off')
+plt.savefig(os.path.join(dir_path, "uniform_kernel_plot.png"), bbox_inches='tight', dpi=300)
 plt.show()
 
 # 3 - Apply kernel to image
-im_u = cv2.filter2D(img_gray, -1, Ku)
+imU = cv2.filter2D(img_gray, -1, kU)
 
 # 4 - Gaussian blur from scratch
 def kgauss(sigma, half_width):
@@ -40,25 +41,30 @@ def kgauss(sigma, half_width):
     return kernel
 
 # Gaussian Blur with sigma 5 and half width of 8
-KG = kgauss(5, 8)
+kG = kgauss(5, 8)
 
 plt.figure(figsize=(6, 6))
-plt.imshow(KG, cmap='gray', interpolation='nearest')
+plt.imshow(kG, cmap='gray', interpolation='nearest')
 plt.title("Gaussian Kernel")
 plt.colorbar()
 plt.axis('off')
+plt.savefig(os.path.join(dir_path, "gaussian_kernel_plot.png"), bbox_inches='tight', dpi=300)
 plt.show()
 
 # 5 - Apply Gaussian blur
-im_g = cv2.filter2D(img_gray, -1, KG)
-cv2.imshow("blur_cv2", im_g)
+imG = cv2.filter2D(img_gray, -1, kG)
+cv2.imshow("blur_cv2", imG)
 cv2.waitKey(0)
 
 # Gaussian blur direct implementation
-# im_g = cv2.GaussianBlur(img_gray, (17, 17), 5)
+# imG = cv2.GaussianBlur(img_gray, (17, 17), 5)
 
 # 6 - Show image
-cv2.imshow("Image with uniform filter", im_u)
+cv2.imshow("Image with uniform filter", imU)
 cv2.waitKey(0)
-cv2.imshow("Image with Gaussian filter", im_g)
+cv2.imshow("Image with Gaussian filter", imG)
 cv2.waitKey(0)
+
+# Save images
+cv2.imwrite(dir_path + "\\flowers4_uniform.png", imU)
+cv2.imwrite(dir_path + "\\flowers4_gaussian.png", imG)
