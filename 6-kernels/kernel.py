@@ -26,3 +26,25 @@ plt.show()
 # 3 - Apply kernel to image
 im_u = cv2.filter2D(img_gray, -1, Ku)
 
+# 4 - Gaussian blur from scratch
+def kgauss(sigma, half_width):
+    size = half_width * 2 + 1   # Size must be odd
+    if size % 2 == 0:
+        raise ValueError("Size must be odd.")
+
+    ax = np.arange(-half_width, half_width + 1) # -half_width to half_width around center pixel
+    xx, yy = np.meshgrid(ax, ax)    # 2D grid for kernel
+    kernel = np.exp(-(xx**2 + yy**2) / (2. * sigma**2))
+    kernel /= kernel.sum()  # Normaliza para volume unitário
+
+    return kernel
+
+# Gaussian Blur with sigma 5 and half width of 8
+KG = kgauss(5, 8)
+
+plt.figure(figsize=(6, 6))
+plt.imshow(KG, cmap='gray', interpolation='nearest')
+plt.title("Gaussian Kernel")
+plt.colorbar()
+plt.axis('off')
+plt.show()
