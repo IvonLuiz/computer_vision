@@ -14,11 +14,10 @@ def imshow(img):
 dir_path = os.path.dirname(os.path.realpath(__file__))
 img_path = os.path.join(dir_path, "aviao_ed.png")
 img = cv2.imread(img_path)
+imshow(img)
 
 gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 _, binary_img = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)
-
-imshow(binary_img)
 
 # Image moments
 M = cv2.moments(binary_img)
@@ -71,3 +70,4 @@ ellipse = cv2.ellipse(
 )
 
 imshow(ellipse)
+cv2.imwrite(os.path.join(dir_path, 'centroid_ellipse.png'), ellipse)
