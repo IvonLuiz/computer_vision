@@ -53,3 +53,21 @@ axes = (int(a / 2), int(b / 2))
 
 print(f"Major axis 'a': {a}\nMinor axis 'b': {b}")
 
+# e) Orientation
+theta_rad = 0.5 * np.arctan((2 * mu11) / (mu20 - mu02))
+theta_dgr = np.degrees(theta_rad)
+print(f"Orientation in degrees: {theta_dgr}")
+
+# f) Plot
+ellipse = cv2.ellipse(
+    img,
+    centroids,
+    axes,
+    theta_dgr,
+    0,
+    360,
+    (255, 0, 0),
+    2,
+)
+
+imshow(ellipse)
