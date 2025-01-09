@@ -25,13 +25,17 @@ if lines is not None:
     for i in range(0, len(lines)):
         rho = lines[i][0][0]
         theta = lines[i][0][1]
+        
         a = math.cos(theta)
         b = math.sin(theta)
+        
         x0 = a * rho
         y0 = b * rho
+        
         pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
         pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
-        cv2.line(edgesP, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
+
+        cv2.line(edgesT, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
 
 # Detect points that form a line
 # lines = cv2.HoughLinesP(edges, 1, np.pi/180, 68, minLineLength=15, maxLineGap=250)
@@ -39,19 +43,25 @@ if lines is not None:
 # lines = cv2.HoughLines(edges, 1, np.pi/180, 150, None,0 ,0)
 #lines = cv2.HoughLinesP(edges, 1, np.pi/180, minLineLength=10, maxLineGap=250)
 # print(lines)
-
 # Draw lines on the image
 # for line in lines:
 #    x1, y1, x2, y2 = line[0]
 #    cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 3)
 
+linesP = cv2.HoughLinesP(edges, 1, np.pi / 180, 50, None, 50, 10)
+
+if linesP is not None:
+    for i in range(0, len(linesP)):
+        l = linesP[i][0]
+        cv2.line(edgesP, (l[0], l[1]), (l[2], l[3]), (0,0,255), 3, cv2.LINE_AA)
+    
 
 # Show result
 print("Line Detection using Hough Transform")
 
 cv2.imshow("Source", src)
-cv2.imshow("Detected Lines (in red) - Standard Hough Line Transform", edgesP)
-# cv2.imshow("Detected Lines (in red) - Probabilistic Line Transform", cdstP)
+cv2.imshow("Detected Lines (in red) - Standard Hough Line Transform", edgesT)
+cv2.imshow("Detected Lines (in red) - Probabilistic Line Transform", edgesP)
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
