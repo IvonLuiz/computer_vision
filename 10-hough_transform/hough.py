@@ -53,5 +53,8 @@ cv2.imshow("Edges", edges)
 cv2.imshow("Detected Lines (in red) - Standard Hough Line Transform", imgHoughLines)
 cv2.imshow("Detected Lines (in red) - Probabilistic Line Transform", imgHoughLinesProb)
 
+cv2.imwrite(os.path.join(dir_path, "Detected_Lines_Standard_Hough.jpg"), imgHoughLines)
+cv2.imwrite(os.path.join(dir_path, "Detected_Lines_Probabilistic_Hough.jpg"), imgHoughLinesProb)
+
 cv2.waitKey(0)
 cv2.destroyAllWindows()
