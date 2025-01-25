@@ -7,6 +7,7 @@ from sklearn.cluster import KMeans
 from scipy.ndimage import center_of_mass
 from scipy.ndimage import label
 
+from sklearn.metrics import silhouette_score
 
 video_name = "Video1_husky.mp4"
 
@@ -54,7 +55,7 @@ def rgb_splitter(image):
     fig.tight_layout()
 
 
-rgb_splitter(ref_img)
+#rgb_splitter(ref_img)
 
 img_blur = cv2.GaussianBlur(ref_img, (5, 5), 1.5)
 
@@ -68,7 +69,7 @@ b = one_matrix- (r + g)
 img_chromatic_rgb = cv2.merge([np.uint8(r*255),
                                np.uint8(g*255),
                                np.uint8(b*255)]) 
-cv2.imshow("Chromatic RGB img", img_chromatic_rgb)
+#cv2.imshow("Chromatic RGB img", img_chromatic_rgb)
 
 def RG_Chroma_plotter(red, green):
     p_color = [(r, g, 1-r-g) for r,g in zip(red.flatten(), green.flatten())]
@@ -88,14 +89,86 @@ def RG_Chroma_plotter(red, green):
     ax.set_ylim([0, 1])
     plt.show()
 
-RG_Chroma_plotter(r, g)
+#RG_Chroma_plotter(r, g)
 
 # Flatten the chromaticity coordinates for clustering
 chromaticity = np.float32(np.stack([r.flatten(), g.flatten()], axis=1))
 
-kmeans = KMeans(n_clusters=7, random_state=42).fit(chromaticity)
+def calculate_WSS(points, kmin, kmax):
+  sse = []
+  for k in range(kmin, kmax+1):
+    kmeans = KMeans(n_clusters = k).fit(points)
+    centroids = kmeans.cluster_centers_
+    pred_clusters = kmeans.predict(points)
+    curr_sse = 0
+    
+    # calculate square of Euclidean distance of each point from its cluster center and add to current WSS
+    for i in range(len(points)):
+      curr_center = centroids[pred_clusters[i]]
+      curr_sse += (points[i, 0] - curr_center[0]) ** 2 + (points[i, 1] - curr_center[1]) ** 2
+      
+    sse.append(curr_sse)
+    #sse.append(kmeans.inertia_)
+
+  return sse
+
+def find_elbow_point(wss, kmin, kmax):
+    # Cria os pontos do gráfico para os clusters
+    x = np.arange(kmin, kmax+1)
+    y = np.array(wss)
+    
+    # Define a linha entre o primeiro e último ponto
+    p1 = np.array([x[0], y[0]])
+    p2 = np.array([x[-1], y[-1]])
+    
+    distances = []
+    for i in range(len(x)):
+        # Calcula a distância perpendicular de cada ponto à linha
+        p = np.array([x[i], y[i]])
+        distance = np.abs(np.cross(p2-p1, p1-p)) / np.linalg.norm(p2-p1)
+        distances.append(distance)
+    
+    # Encontra o índice com maior distância (cotovelo)
+    elbow_index = np.argmax(distances)
+    return x[elbow_index], distances
+
+kmin = 2
+kmax = 15
+print("Calculating WSS...")
+wss = calculate_WSS(chromaticity, kmin, kmax)
+elbow_k, distances = find_elbow_point(wss, kmin, kmax)
+
+x = np.arange(kmin, kmax+1)
+y = np.array(wss)
+
+plt.figure(figsize=(10, 6))
+plt.plot(x, y, marker='o', linestyle='-', label='WSS')
+plt.axvline(x=elbow_k, color='r', linestyle='--', label=f'Elbow at k={elbow_k}')
+plt.scatter([elbow_k], [y[elbow_k - kmin]], color='red', label='Elbow Point', zorder=5)
+
+plt.title('Elbow Method for Optimal k', fontsize=16)
+plt.xlabel('Number of Clusters (k)', fontsize=14)
+plt.ylabel('Within Sum of Squares (WSS)', fontsize=14)
+plt.xticks(x)
+plt.grid(alpha=0.3)
+plt.legend(fontsize=12)
+plt.show()
+
+print(f"The optimal number of clusters based on the elbow method is: {elbow_k}")
+
+def calculate_silhouette(points, kmin, kmax):
+    sil = []
+    for k in range(kmin, kmax+1):
+        kmeans = KMeans(n_clusters=k, n_init=10, max_iter=300, random_state=42).fit(points)
+        labels = kmeans.labels_
+        sil_score = silhouette_score(points, labels, metric='euclidean')
+        sil.append(sil_score)
+        print(f"Silhouette score for k={k}: {sil_score}")
+    return sil
+
+# Clustering with optimal number o k from elbow
+kmeans = KMeans(n_clusters=elbow_k, random_state=42).fit(chromaticity)
 labels = kmeans.labels_.reshape(r.shape)
-print(labels)
 
 # Plot the chromaticity plane with clusters
 plt.figure(figsize=(10, 6))
