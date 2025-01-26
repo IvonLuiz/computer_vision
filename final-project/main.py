@@ -94,6 +94,8 @@ def RG_Chroma_plotter(red, green):
 # Flatten the chromaticity coordinates for clustering
 chromaticity = np.float32(np.stack([r.flatten(), g.flatten()], axis=1))
 
+
+## Finding best k to cluster
 def calculate_WSS(points, kmin, kmax):
   sse = []
   for k in range(kmin, kmax+1):
@@ -113,47 +115,48 @@ def calculate_WSS(points, kmin, kmax):
   return sse
 
 def find_elbow_point(wss, kmin, kmax):
-    # Cria os pontos do gráfico para os clusters
+    # Points for graph clusters
     x = np.arange(kmin, kmax+1)
     y = np.array(wss)
     
-    # Define a linha entre o primeiro e último ponto
+    # Defines line between first and last point
     p1 = np.array([x[0], y[0]])
     p2 = np.array([x[-1], y[-1]])
     
     distances = []
     for i in range(len(x)):
-        # Calcula a distância perpendicular de cada ponto à linha
+        # Calculates perpendicular distance from each point to line
         p = np.array([x[i], y[i]])
         distance = np.abs(np.cross(p2-p1, p1-p)) / np.linalg.norm(p2-p1)
         distances.append(distance)
     
-    # Encontra o índice com maior distância (cotovelo)
+    # Best index
     elbow_index = np.argmax(distances)
+
     return x[elbow_index], distances
 
 kmin = 2
 kmax = 15
 print("Calculating WSS...")
-wss = calculate_WSS(chromaticity, kmin, kmax)
-elbow_k, distances = find_elbow_point(wss, kmin, kmax)
+# wss = calculate_WSS(chromaticity, kmin, kmax)
+# elbow_k, distances = find_elbow_point(wss, kmin, kmax)
 
-x = np.arange(kmin, kmax+1)
-y = np.array(wss)
+# x = np.arange(kmin, kmax+1)
+# y = np.array(wss)
 
-plt.figure(figsize=(10, 6))
-plt.plot(x, y, marker='o', linestyle='-', label='WSS')
-plt.axvline(x=elbow_k, color='r', linestyle='--', label=f'Elbow at k={elbow_k}')
-plt.scatter([elbow_k], [y[elbow_k - kmin]], color='red', label='Elbow Point', zorder=5)
+# plt.figure(figsize=(10, 6))
+# plt.plot(x, y, marker='o', linestyle='-', label='WSS')
+# plt.axvline(x=elbow_k, color='r', linestyle='--', label=f'Elbow at k={elbow_k}')
+# plt.scatter([elbow_k], [y[elbow_k - kmin]], color='red', label='Elbow Point', zorder=5)
 
-plt.title('Elbow Method for Optimal k', fontsize=16)
-plt.xlabel('Number of Clusters (k)', fontsize=14)
-plt.ylabel('Within Sum of Squares (WSS)', fontsize=14)
-plt.xticks(x)
-plt.grid(alpha=0.3)
-plt.legend(fontsize=12)
-plt.show()
-
+# plt.title('Elbow Method for Optimal k', fontsize=16)
+# plt.xlabel('Number of Clusters (k)', fontsize=14)
+# plt.ylabel('Within Sum of Squares (WSS)', fontsize=14)
+# plt.xticks(x)
+# plt.grid(alpha=0.3)
+# plt.legend(fontsize=12)
+# plt.show()
+elbow_k = 5
 print(f"The optimal number of clusters based on the elbow method is: {elbow_k}")
 
 def calculate_silhouette(points, kmin, kmax):
@@ -165,6 +168,7 @@ def calculate_silhouette(points, kmin, kmax):
         sil.append(sil_score)
         print(f"Silhouette score for k={k}: {sil_score}")
     return sil
+
 
 # Clustering with optimal number o k from elbow
 kmeans = KMeans(n_clusters=elbow_k, random_state=42).fit(chromaticity)
@@ -188,6 +192,36 @@ plt.imshow(img_labels)
 plt.axis('off')
 plt.show()
 
+# Find cluster with red
+red_cluster_idx = np.argmin(kmeans.cluster_centers_[:, 1])  # Maior valor de r
+print(kmeans.cluster_centers_)
+
+print(red_cluster_idx)
+red_mask = (labels == red_cluster_idx)
+
+plt.figure(figsize=(8, 6), dpi=80)
+plt.imshow(red_mask, cmap='Reds')
+plt.title("Máscara do cluster vermelho")
+plt.axis('off')
+plt.show()
+
+# Encontrar o centro de massa da região vermelha
+labeled, num_features = label(red_mask)
+centroids = center_of_mass(red_mask, labeled, np.arange(1, num_features+1))
+
+# Plotar os centroides na máscara
+plt.figure(figsize=(8, 6))
+plt.imshow(red_mask, cmap='Reds')
+for c in centroids:
+    plt.scatter(c[1], c[0], color='blue', marker='x', s=100, label='Centroide')
+plt.title("Centroides na máscara do cluster vermelho")
+plt.legend()
+plt.axis('off')
+plt.show()
+
+# Salvando os centroides para cada frame
+pose_data = []
+pose_data.append(centroids)
 
 # for img in images:
     ## Converting to binary
