@@ -17,7 +17,10 @@ class Tracker:
 
     def train_kmeans(self, reference_frame, kmin, kmax):
         """
-        Trains KMeans model using a reference frame.
+        Trains a KMeans clustering model to segment the chromaticity of an image using a reference frame.
+        The method calculates the chromaticity of the input image, determines the optimal number of clusters
+        using the Elbow method, and applies the KMeans algorithm to segment the image into clusters based on
+        color information.
         """
         chromaticity = self.get_chromaticity(reference_frame)
 
@@ -36,6 +39,12 @@ class Tracker:
 
 
     def get_chromaticity(self, frame):
+        """
+        Calculates the chromaticity of an image by first applying a Gaussian blur to the input frame.
+        Chromaticity represents the color intensity of the red and green channels relative to the 
+        sum of all three color channels (Red, Green, and Blue).
+        """
+
         frame_blur = cv2.GaussianBlur(frame, (7, 7), 2.0)
         Y = frame_blur.sum(axis=2) # R + G + B
         Y[Y == 0] = 1e-6
@@ -50,7 +59,12 @@ class Tracker:
 
     def process_video(self, video_path):
         """
-        Process video to create masks with cluster idx and moments to save videos.
+        Processes a video to generate masks based on the trained KMeans model, tracks the red color cluster, 
+        and calculates moments (such as centroid, area, and orientation) for each frame.
+        The method creates two output videos:
+        1. A video with the red cluster masked (where the red cluster is highlighted).
+        2. A processed video showing the trajectory of the centroids and an ellipse representing the object's 
+        orientation and shape.
         """
         if self.kmeans is None:
             raise ValueError("KMeans model has not been trained. Call train_kmeans() first.")
@@ -58,7 +72,8 @@ class Tracker:
         cap = cv2.VideoCapture(video_path)
         redbox_cluster_mask = []
         moments_frames = []
-
+        trajectory = []  # List to store centroid positions for trajectory
+        
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
@@ -92,6 +107,12 @@ class Tracker:
                 cY = M['m01'] / area
                 centroid = (int(cX), int(cY))
 
+                # Saving trajectory with centroids and plotting
+                trajectory.append(centroid)
+
+                for i in range(1, len(trajectory)):
+                    cv2.line(frame, trajectory[i - 1], trajectory[i], (0, 255, 255), 2)
+                
                 # Central moments and inertia matrix
                 mu20, mu02, mu11 = M['mu20'], M['mu02'], M['mu11']
                 inertia_matrix = np.array([[mu20, mu11], [mu11, mu02]])
