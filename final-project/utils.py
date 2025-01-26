@@ -3,26 +3,14 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 import numpy as np
 from sklearn.cluster import KMeans
+import os
 
-# Função para subtração de frames
-def subtract_frames(prev_frame, curr_frame):
-    # Converter para escala de cinza
-    prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-    curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
-    
-    # Subtração absoluta entre os frames
-    diff = cv2.absdiff(prev_gray, curr_gray)
-    
-    # Aplicar um limiar para identificar áreas de movimento
-    #_, thresh = cv2.threshold(diff, 50, 255, cv2.THRESH_BINARY)
-    
-    return diff
 
 ## Finding best k to cluster
 def calculate_WSS(points, kmin, kmax):
   sse = []
   for k in range(kmin, kmax+1):
-    kmeans = KMeans(n_clusters = k).fit(points)
+    kmeans = KMeans(n_clusters = k, random_state=42).fit(points)
     centroids = kmeans.cluster_centers_
     pred_clusters = kmeans.predict(points)
     curr_sse = 0
@@ -57,6 +45,45 @@ def find_elbow_point(wss, kmin, kmax):
     elbow_index = np.argmax(distances)
 
     return x[elbow_index], distances
+
+def create_video(path, frames):
+    path = path + ".avi"
+    fps = 30
+
+    # Shape of video based on the first frame
+    first_frame = frames[0]
+    if len(first_frame.shape) == 2:
+        # Grayscale frame
+        frame_height, frame_width = first_frame.shape
+        is_color = False
+    elif len(first_frame.shape) == 3 and first_frame.shape[2] == 3:
+        # RGB frame
+        frame_height, frame_width, _ = first_frame.shape
+        is_color = True
+    else:
+        print("Error: Invalid frame format. Frames should be 2D (grayscale) or 3D (RGB).")
+        return
+
+    # Initialize the writer
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Codec for AVI format
+    out = cv2.VideoWriter(path, fourcc, fps, (frame_width, frame_height), isColor=is_color)
+
+    # Create the video from frames
+    print("Creating video...")
+
+    for idx, frame in enumerate(frames):
+        if idx%500 == 0:
+            print(f"Processed {idx}/{len(frames)} frames")
+        if is_color:
+            frame = np.uint8(frame)  # Ensure the frame is in the correct format
+        else:
+            frame = np.uint8(frame * 255)  # Scale grayscale values to 0-255
+
+        out.write(frame)
+
+    # Release the writer and finish
+    out.release()
+    print(f"Video saved on {path}")
 
 def rgb_splitter(image):
     rgb_list = ['Reds','Greens','Blues']
@@ -108,3 +135,26 @@ def plot_clusters(chromaticity, kmeans):
     plt.ylabel("Chromaticity g")
     plt.title("Chromaticity Plane with K-means Clusters")
     plt.legend()
+
+
+# # Changing data type
+# img_norm = (ref_img/255).astype('float32')
+# print(img_norm.min(), img_norm.max())
+# cv2.imshow("normalized", img_norm)
+
+# # Changing brightness
+# img_bright = np.clip(img_norm + 0.25, 0, 1)
+# cv2.imshow("bright", img_bright)
+
+# # Changing contrast
+# img_contrast = np.clip(img_norm * 2, 0, 1)
+# cv2.imshow("contrast", img_contrast)
+
+# # Negative image
+# img_neg = 1 - img_norm
+# cv2.imshow("neg", img_neg)
+
+# # Posterization
+# N = 4
+# img_post = np.floor(img_norm * N) / N
+# cv2.imshow("post", img_post)
