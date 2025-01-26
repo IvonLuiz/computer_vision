@@ -16,29 +16,8 @@ def subtract_frames(prev_frame, current_frame):
     _, thresh = cv2.threshold(diff, 22, 255, cv2.THRESH_BINARY)
     return thresh
 
-def calculate_movement_masks(images):
-    prev_frame_blur = None
-    movement_masks = []
 
-    for frame in images:
-        frame_blur = cv2.GaussianBlur(frame, (7, 7), 2.5)
-        
-        if prev_frame_blur is not None:
-            movement_mask = subtract_frames(prev_frame_blur, frame_blur)
-            movement_masks.append(movement_mask)
-        prev_frame_blur = frame_blur
-    
-    return movement_masks
-
-def combine_red_and_movement(red_masks, movement_masks):
-    combined_masks = []
-    for red_mask, movement_mask in zip(red_masks, movement_masks):
-        combined = cv2.bitwise_and(red_mask, movement_mask)
-        combined_masks.append(combined)
-    return combined_masks
-
-
-video_name = "Video1_husky.mp4"
+video_name = "video.mp4"
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 video_path = os.path.join(dir_path, video_name)
@@ -83,13 +62,12 @@ while cap.isOpened():
         break
 
 # One frame for reference
-ref_img = images[670] # 670 moment that pass on a obstacle
-# ref_movement = movement[500]
+ref_img = images[200] # 670 moment that pass on a obstacle
 
 rgb_splitter(ref_img)
 
 img_blur = ref_img
-img_blur = cv2.GaussianBlur(ref_img, (5, 5), 1.0)
+img_blur = cv2.GaussianBlur(ref_img, (11, 11), 1.0)
 
 Y = img_blur.sum(axis=2) # R + G + B
 r = img_blur[:,:,0] / Y
@@ -135,7 +113,6 @@ labels = kmeans.labels_.reshape(r.shape)
 # Find clusters with most red (to our eyes)
 red_cluster_idx = np.argmin(np.sum(kmeans.cluster_centers_, axis=1))
 
-
 predictions = kmeans.predict(chromaticity)
 img_labels = predictions.reshape(r.shape) 
 
@@ -144,119 +121,122 @@ img_labels = predictions.reshape(r.shape)
 # plt.axis('off')
 
 
-print(red_cluster_idx)
-# red_mask = (labels == red_cluster_idx)
-
-cluster_masks = []
+## Binary redbox video processing using cluster
+redbox_cluster_mask = []
 
 for frame in images:
-    print("processing frame number: ", len(cluster_masks) + 1)
+    print("processing frame number: ", len(redbox_cluster_mask) + 1)
     # Aplicar desfoque
-    img_blur = cv2.GaussianBlur(frame, (5, 5), 1.0)
-    
-    # Converter para coordenadas cromáticas
+    img_blur = cv2.GaussianBlur(frame, (11, 11), 1.0)
+    img_blur = frame
+
+    # Chromatic coordinates converter
     Y = img_blur.sum(axis=2)  # R + G + B
     Y[Y == 0] = 1e-6  # Substituir 0 por um valor muito pequeno
     
-    # Calcular r e g, garantindo que não hajam NaNs
+    # NaNs handling
     r = np.nan_to_num(img_blur[:, :, 0] / Y, nan=0.0, posinf=0.0, neginf=0.0)
     g = np.nan_to_num(img_blur[:, :, 1] / Y, nan=0.0, posinf=0.0, neginf=0.0)
     
     chromaticity = np.float32(np.stack([r.flatten(), g.flatten()], axis=1))
     
-    # Previsões usando KMeans treinado
+    # Predictions using pre-trained kmeans
     predictions = kmeans.predict(chromaticity)
     labels = predictions.reshape(r.shape)
     
-    # Máscara do cluster vermelho
-    red_mask = (labels == red_cluster_idx)
-    cluster_masks.append(red_mask)
+    # Masking
+    redbox = (labels == red_cluster_idx)
+    redbox_cluster_mask.append(redbox)
 
-create_video("masks red.avi", cluster_masks)
+create_video("masks red", redbox_cluster_mask)
+
+## Movement dyadic operation
 movement_masks = []
-prev_mask = None
+prev_mask = redbox_cluster_mask[0]
 
-
-
-plt.figure(figsize=(8, 6), dpi=80)
-plt.imshow(red_mask, cmap='Reds')
-plt.title("Máscara do cluster vermelho")
-plt.axis('off')
-plt.show()
-
-
-# # Encontrar o centro de massa da região vermelha filtrada
-
-labeled, num_features = label(red_mask)
-centroids = center_of_mass(red_mask, labeled, np.arange(1, num_features + 1))
-
-# Plotar os centroides na máscara
-plt.figure(figsize=(8, 6))
-#plt.imshow(red_mask, cmap='Reds')
-
-# for c in centroids:
-#     plt.scatter(c[1], c[0], color='blue', marker='x', s=100, label='Centroide')
-# plt.title("Centroides na máscara do cluster vermelho")
-# plt.legend()
-# plt.axis('off')
-# plt.show()
-
-# Salvando os centroides para cada frame
-pose_data = []
-pose_data.append(centroids)
-
-print(red_mask)
-# Converting to binary
-#gray_image = cv2.cvtColor(red_mask, cv2.COLOR_BGR2GRAY)
-#_, binary_img = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
-
-red_mask_uint8 = (red_mask * 255).astype(np.uint8)
-
-# Image moments
-M = cv2.moments(red_mask_uint8)
-
-# a) Area
-area = M['m00']
-print(f"Area from object: {area}")
-
-# b) Centroids
-cX = M["m10"] / area
-cY = M["m01"] / area
-centroids = (int(cX), int(cY))
-print("centroids", centroids)
-
-cv2.circle(ref_img, centroids, 20, (255, 0, 0), 2)
-plt.figure(figsize=(8, 6), dpi=80)
-plt.imshow(ref_img)
-plt.axis('off')
-plt.show()
-
-# for img in images:
-    ## Converting to binary
-    # gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # _, binary_img = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
+for current_mask in redbox_cluster_mask[1:]:
+    # Subtracting consecutive frames
+    movement = cv2.absdiff(prev_mask.astype(np.uint8), current_mask.astype(np.uint8))
+    movement_masks.append(movement)
     
-    # # Image moments
-    # M = cv2.moments(binary_img)
+    prev_mask = current_mask # update
 
-    # # a) Area
-    # area = M['m00']
-    # print(f"Area from object: {area}")
+create_video("movement", movement_masks)
 
-    # # b) Centroids
-    # cX = M["m10"] / area
-    # cY = M["m01"] / area
-    # centroids = (int(cX), int(cY))
-    # cv2.imshow('Framee', img)
-    # # Press Q on keyboard to exit
-    # if cv2.waitKey(25) & 0xFF == ord('q'):
-    #     break
+## Moments
+# Encontrar o centro de massa da região vermelha filtrada
+moments_frames = []
 
+for idx, redbox_frame in enumerate(redbox_cluster_mask):
+    frame_original = images[idx]
+    red_mask_uint8 = (redbox_frame * 255).astype(np.uint8)
 
+    labeled, num_features = label(redbox_frame)
+    centroids = center_of_mass(redbox_frame, labeled, np.arange(1, num_features + 1))
 
-# When everything done, release
-# the video capture object
-cap.release()
+    # Image moments
+    M = cv2.moments(red_mask_uint8)
+
+    # a) Area
+    area = M['m00']
+
+    if area == 0:
+        print("Área da máscara é zero. Nenhum objeto detectado.")
+    else:
+        # b) Centroids
+        cX = M["m10"] / area
+        cY = M["m01"] / area
+        centroid = (int(cX), int(cY))
+
+        # c) Central moments and inertia matrix
+        mu20 = M["mu20"]
+        mu02 = M["mu02"]
+        mu11 = M["mu11"]
+        inertia_matrix = np.array([[mu20, mu11], [mu11, mu02]])
+
+        # d) Equivalent ellipse
+        eigenvalues, eigenvectors = np.linalg.eig(inertia_matrix)
+
+        a = 4 * np.sqrt(eigenvalues[0] / area)  # major axis length
+        b = 4 * np.sqrt(eigenvalues[1] / area)  # minor axis length
+        axes = (int(a / 2), int(b / 2))
+
+        # e) Orientation
+        theta_rad = 0.5 * np.arctan((2 * mu11) / (mu20 - mu02))
+        theta_dgr = np.degrees(theta_rad)
+
+        # f) Ellipse to Plot
+        ellipse = cv2.ellipse(
+            frame_original,
+            centroid,
+            axes,
+            theta_dgr,
+            0,
+            360,
+            (255, 0, 0),
+            2,
+        )
+
+        cv2.circle(frame_original, centroid, 5, (0, 0, 255), -1)  # Centróide: ponto vermelho
+        cv2.putText(frame_original, f"Angle: {theta_dgr:.2f} degrees", (centroid[0] - 50, centroid[1] + 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+
+    moments_frames.append(frame_original)
+
+        # # Desenhar o centróide na imagem de referência
+        # ref_img_with_centroid = red_mask_uint8.copy()
+        # cv2.circle(ref_img_with_centroid, centroids, 10, (0, 0, 0), 2)
+
+        # # Exibir a imagem com o centróide
+        # plt.figure(figsize=(8, 6), dpi=80)
+        # plt.imshow(ref_img_with_centroid, cmap="gray")
+        # plt.axis('off')
+        # plt.show()
+
+print(moments_frames[0])
+print(moments_frames[0].shape)
+create_video("processed_video", moments_frames)
+
 
 # Closes all the frames
 cv2.destroyAllWindows()
