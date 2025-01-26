@@ -6,48 +6,21 @@ from sklearn.cluster import KMeans
 from scipy.ndimage import center_of_mass
 from scipy.ndimage import label
 
-from sklearn.metrics import silhouette_score
-
 from utils import *
 
-def subtract_frames(prev_frame, current_frame):
-    diff = cv2.absdiff(prev_frame, current_frame)
-    gray_diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(diff, 22, 255, cv2.THRESH_BINARY)
-    return thresh
-
-
-video_name = "video.mp4"
+video_name = "Video1_husky.mp4"
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-video_path = os.path.join(dir_path, video_name)
 
+video_path = os.path.join(dir_path, video_name)
 cap = cv2.VideoCapture(video_path)
 images = []
-movement = []
-# prev_frame_blur = None
 
 while cap.isOpened():
     # Capture frame-by-frame
     ret, frame = cap.read()
 
     if ret==True:
-        # if prev_frame_blur is not None:
-
-            # frame_blur = cv2.GaussianBlur(frame, (7, 7), 2.5)
-            # movement_mask = subtract_frames(prev_frame_blur, frame_blur)
-            # movement.append(movement_mask)
-            # cv2.imshow('frame', movement_mask)
-
-            # if cv2.waitKey(25) & 0xFF == ord('q'):
-            #     break
-
-        # prev_frame_blur = frame
-        # gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        #gray_images.append(gray_image)
-        
-        # print("added image")
-
         images.append(frame)
     #     # Display the resulting frame
     #     cv2.imshow('Frame', frame)
@@ -58,16 +31,16 @@ while cap.isOpened():
 
     # Break the loop
     else:
-        print("all images added")
+        print("All images read")
         break
 
 # One frame for reference
-ref_img = images[200] # 670 moment that pass on a obstacle
+ref_img = images[1045] # 670 moment that pass on a obstacle
 
-rgb_splitter(ref_img)
+# rgb_splitter(ref_img)
 
 img_blur = ref_img
-img_blur = cv2.GaussianBlur(ref_img, (11, 11), 1.0)
+img_blur = cv2.GaussianBlur(ref_img, (7, 7), 2.0)
 
 Y = img_blur.sum(axis=2) # R + G + B
 r = img_blur[:,:,0] / Y
@@ -86,29 +59,27 @@ img_chromatic_rgb = cv2.merge([np.uint8(r*255),
 # Flatten the chromaticity coordinates for clustering
 chromaticity = np.float32(np.stack([r.flatten(), g.flatten()], axis=1))
 
-
 ## Search for optimal value of K clusters with elbow method
 kmin = 2
 kmax = 15
 
 print("Calculating WSS...")
+wss = calculate_WSS(chromaticity, kmin, kmax)
+elbow_k, distances = find_elbow_point(wss, kmin, kmax)
 
-#wss = calculate_WSS(chromaticity, kmin, kmax)
-elbow_k = 5
-# elbow_k, distances = find_elbow_point(wss, kmin, kmax)
 print(f"The optimal number of clusters based on the elbow method is: {elbow_k}")
 
 # x = np.arange(kmin, kmax+1)
 # y = np.array(wss)
 # plot_elbow(x, y, elbow_k, kmin)
 
-## Clustering
+## Train cluster
 # Clustering with optimal number of k from elbow
 kmeans = KMeans(n_clusters=elbow_k, random_state=42).fit(chromaticity)
 labels = kmeans.labels_.reshape(r.shape)
 
 # Plot the chromaticity plane with clusters
-# plot_clusters(chromaticity, kmeans)
+plot_clusters(chromaticity, kmeans)
 
 # Find clusters with most red (to our eyes)
 red_cluster_idx = np.argmin(np.sum(kmeans.cluster_centers_, axis=1))
@@ -116,18 +87,18 @@ red_cluster_idx = np.argmin(np.sum(kmeans.cluster_centers_, axis=1))
 predictions = kmeans.predict(chromaticity)
 img_labels = predictions.reshape(r.shape) 
 
-# plt.figure(figsize=(8, 6), dpi=80)
-# plt.imshow(img_labels)
-# plt.axis('off')
-
+plt.figure(figsize=(8, 6), dpi=80)
+plt.imshow(img_labels)
+plt.axis('off')
+plt.show()
 
 ## Binary redbox video processing using cluster
 redbox_cluster_mask = []
 
 for frame in images:
-    print("processing frame number: ", len(redbox_cluster_mask) + 1)
+    # print("Processing frame: ", len(redbox_cluster_mask) + 1)
     # Aplicar desfoque
-    img_blur = cv2.GaussianBlur(frame, (11, 11), 1.0)
+    img_blur = cv2.GaussianBlur(frame, (7, 7), 2.0)
     img_blur = frame
 
     # Chromatic coordinates converter
@@ -223,20 +194,7 @@ for idx, redbox_frame in enumerate(redbox_cluster_mask):
 
     moments_frames.append(frame_original)
 
-        # # Desenhar o centróide na imagem de referência
-        # ref_img_with_centroid = red_mask_uint8.copy()
-        # cv2.circle(ref_img_with_centroid, centroids, 10, (0, 0, 0), 2)
-
-        # # Exibir a imagem com o centróide
-        # plt.figure(figsize=(8, 6), dpi=80)
-        # plt.imshow(ref_img_with_centroid, cmap="gray")
-        # plt.axis('off')
-        # plt.show()
-
-print(moments_frames[0])
-print(moments_frames[0].shape)
 create_video("processed_video", moments_frames)
-
 
 # Closes all the frames
 cv2.destroyAllWindows()
