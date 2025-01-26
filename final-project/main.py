@@ -13,21 +13,29 @@ from utils import *
 def subtract_frames(prev_frame, current_frame):
     diff = cv2.absdiff(prev_frame, current_frame)
     gray_diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray_diff, 22, 255, cv2.THRESH_BINARY)
+    _, thresh = cv2.threshold(diff, 22, 255, cv2.THRESH_BINARY)
     return thresh
 
-def draw_bounding_box(image, mask):
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    for contour in contours:
-        if cv2.contourArea(contour) > 500:  # Filter small areas
-            x, y, w, h = cv2.boundingRect(contour)
-            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            return (x, y, w, h)
-    return None
+def calculate_movement_masks(images):
+    prev_frame_blur = None
+    movement_masks = []
 
-def get_clusters_in_box(clusters, box):
-    x, y, w, h = box
-    return clusters[y:y + h, x:x + w]
+    for frame in images:
+        frame_blur = cv2.GaussianBlur(frame, (7, 7), 2.5)
+        
+        if prev_frame_blur is not None:
+            movement_mask = subtract_frames(prev_frame_blur, frame_blur)
+            movement_masks.append(movement_mask)
+        prev_frame_blur = frame_blur
+    
+    return movement_masks
+
+def combine_red_and_movement(red_masks, movement_masks):
+    combined_masks = []
+    for red_mask, movement_mask in zip(red_masks, movement_masks):
+        combined = cv2.bitwise_and(red_mask, movement_mask)
+        combined_masks.append(combined)
+    return combined_masks
 
 
 video_name = "Video1_husky.mp4"
@@ -74,9 +82,9 @@ while cap.isOpened():
         print("all images added")
         break
 
+# One frame for reference
 ref_img = images[670] # 670 moment that pass on a obstacle
 # ref_movement = movement[500]
-
 
 rgb_splitter(ref_img)
 
@@ -93,10 +101,8 @@ b = one_matrix- (r + g)
 img_chromatic_rgb = cv2.merge([np.uint8(r*255),
                                np.uint8(g*255),
                                np.uint8(b*255)]) 
-cv2.imshow("Chromatic RGB img", img_chromatic_rgb)
 
-
-
+# cv2.imshow("Chromatic RGB img", img_chromatic_rgb)
 # RG_Chroma_plotter(r, g)
 
 # Flatten the chromaticity coordinates for clustering
@@ -109,14 +115,14 @@ kmax = 15
 
 print("Calculating WSS...")
 
-wss = calculate_WSS(chromaticity, kmin, kmax)
-elbow_k, distances = find_elbow_point(wss, kmin, kmax)
-# elbow_k = 5
+#wss = calculate_WSS(chromaticity, kmin, kmax)
+elbow_k = 5
+# elbow_k, distances = find_elbow_point(wss, kmin, kmax)
 print(f"The optimal number of clusters based on the elbow method is: {elbow_k}")
 
-x = np.arange(kmin, kmax+1)
-y = np.array(wss)
-plot_elbow(x, y, elbow_k, kmin)
+# x = np.arange(kmin, kmax+1)
+# y = np.array(wss)
+# plot_elbow(x, y, elbow_k, kmin)
 
 ## Clustering
 # Clustering with optimal number of k from elbow
@@ -124,7 +130,7 @@ kmeans = KMeans(n_clusters=elbow_k, random_state=42).fit(chromaticity)
 labels = kmeans.labels_.reshape(r.shape)
 
 # Plot the chromaticity plane with clusters
-plot_clusters(chromaticity, kmeans)
+# plot_clusters(chromaticity, kmeans)
 
 # Find clusters with most red (to our eyes)
 red_cluster_idx = np.argmin(np.sum(kmeans.cluster_centers_, axis=1))
@@ -133,13 +139,44 @@ red_cluster_idx = np.argmin(np.sum(kmeans.cluster_centers_, axis=1))
 predictions = kmeans.predict(chromaticity)
 img_labels = predictions.reshape(r.shape) 
 
-plt.figure(figsize=(8, 6), dpi=80)
-plt.imshow(img_labels)
-plt.axis('off')
+# plt.figure(figsize=(8, 6), dpi=80)
+# plt.imshow(img_labels)
+# plt.axis('off')
 
 
 print(red_cluster_idx)
-red_mask = (labels == red_cluster_idx)
+# red_mask = (labels == red_cluster_idx)
+
+cluster_masks = []
+
+for frame in images:
+    print("processing frame number: ", len(cluster_masks) + 1)
+    # Aplicar desfoque
+    img_blur = cv2.GaussianBlur(frame, (5, 5), 1.0)
+    
+    # Converter para coordenadas cromáticas
+    Y = img_blur.sum(axis=2)  # R + G + B
+    Y[Y == 0] = 1e-6  # Substituir 0 por um valor muito pequeno
+    
+    # Calcular r e g, garantindo que não hajam NaNs
+    r = np.nan_to_num(img_blur[:, :, 0] / Y, nan=0.0, posinf=0.0, neginf=0.0)
+    g = np.nan_to_num(img_blur[:, :, 1] / Y, nan=0.0, posinf=0.0, neginf=0.0)
+    
+    chromaticity = np.float32(np.stack([r.flatten(), g.flatten()], axis=1))
+    
+    # Previsões usando KMeans treinado
+    predictions = kmeans.predict(chromaticity)
+    labels = predictions.reshape(r.shape)
+    
+    # Máscara do cluster vermelho
+    red_mask = (labels == red_cluster_idx)
+    cluster_masks.append(red_mask)
+
+create_video("masks red.avi", cluster_masks)
+movement_masks = []
+prev_mask = None
+
+
 
 plt.figure(figsize=(8, 6), dpi=80)
 plt.imshow(red_mask, cmap='Reds')
@@ -147,37 +184,6 @@ plt.title("Máscara do cluster vermelho")
 plt.axis('off')
 plt.show()
 
-# Filtra a região de movimento
-# contours, _ = cv2.findContours(ref_movement, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-# # Plot contours
-# plt.figure(figsize=(8, 6))
-# plt.imshow(ref_img)
-# for contour in contours:
-#     x, y, w, h = cv2.boundingRect(contour)
-#     rect = plt.Rectangle((x, y), w, h, edgecolor='r', facecolor='none')
-#     plt.gca().add_patch(rect)
-# plt.title("Contours on Reference Image")
-# plt.axis('off')
-# plt.show()
-
-# Create a mask for the moving region
-# movement_mask = np.zeros_like(ref_movement, dtype=np.uint8)
-
-# for contour in contours:
-#     print(contour)
-#     x, y, w, h = cv2.boundingRect(contour)
-#     cv2.rectangle(movement_mask, (x, y), (x + w, y + h), 255, -1)
-
-# # Filter red_mask if it is inside the contours of movement
-# filtered_red_mask = cv2.bitwise_and(red_mask.astype(np.uint8), red_mask.astype(np.uint8), mask=movement_mask)
-
-# plt.figure(figsize=(8, 6))
-# plt.imshow(filtered_red_mask, cmap='Reds')
-# plt.title("Filtered Red Mask")
-# plt.axis('off')
-# plt.show()
-# print("filtered red mask=", filtered_red_mask)
 
 # # Encontrar o centro de massa da região vermelha filtrada
 
@@ -188,12 +194,12 @@ centroids = center_of_mass(red_mask, labeled, np.arange(1, num_features + 1))
 plt.figure(figsize=(8, 6))
 #plt.imshow(red_mask, cmap='Reds')
 
-for c in centroids:
-    plt.scatter(c[1], c[0], color='blue', marker='x', s=100, label='Centroide')
-plt.title("Centroides na máscara do cluster vermelho")
-plt.legend()
-plt.axis('off')
-#plt.show()
+# for c in centroids:
+#     plt.scatter(c[1], c[0], color='blue', marker='x', s=100, label='Centroide')
+# plt.title("Centroides na máscara do cluster vermelho")
+# plt.legend()
+# plt.axis('off')
+# plt.show()
 
 # Salvando os centroides para cada frame
 pose_data = []
@@ -205,8 +211,6 @@ print(red_mask)
 #_, binary_img = cv2.threshold(gray_image, 50, 255, cv2.THRESH_BINARY)
 
 red_mask_uint8 = (red_mask * 255).astype(np.uint8)
-red_mask_uint8 = filtered_red_mask
-
 
 # Image moments
 M = cv2.moments(red_mask_uint8)
