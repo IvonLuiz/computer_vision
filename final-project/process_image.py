@@ -15,14 +15,14 @@ class Tracker:
         self.frame_shape = None
     
 
-    def train_kmeans(self, reference_frame, kmin, kmax):
+    def train_kmeans(self, reference_frame, kmin, kmax, plots=True):
         """
         Trains a KMeans clustering model to segment the chromaticity of an image using a reference frame.
         The method calculates the chromaticity of the input image, determines the optimal number of clusters
         using the Elbow method, and applies the KMeans algorithm to segment the image into clusters based on
         color information.
         """
-        chromaticity = self.get_chromaticity(reference_frame)
+        chromaticity = self.get_chromaticity(reference_frame, plot=plots)
 
         self.frame_shape = reference_frame.shape[:2]
 
@@ -35,10 +35,16 @@ class Tracker:
         self.kmeans = KMeans(n_clusters=elbow_k, random_state=42).fit(chromaticity)
         self.red_cluster_idx = np.argmin(np.sum(self.kmeans.cluster_centers_, axis=1))
         
-        plot_clusters(chromaticity, self.kmeans)
+        if plots:
+            plot_elbow(x=np.arange(kmin, kmax+1),
+                    y=np.array(wss),
+                    elbow_k=elbow_k,
+                    kmin=kmin)
+            plot_clusters(chromaticity, self.kmeans)
+            plot_cluster_labels(self.kmeans, chromaticity, self.frame_shape)
 
 
-    def get_chromaticity(self, frame):
+    def get_chromaticity(self, frame, plot=False):
         """
         Calculates the chromaticity of an image by first applying a Gaussian blur to the input frame.
         Chromaticity represents the color intensity of the red and green channels relative to the 
@@ -53,6 +59,17 @@ class Tracker:
         g = np.nan_to_num(frame_blur[:, :, 1] / Y, nan=0.0, posinf=0.0, neginf=0.0)
 
         chromaticity = np.float32(np.stack([r.flatten(), g.flatten()], axis=1))
+
+        if plot:
+            one_matrix = np.ones_like(float, shape=r.shape)
+            b = one_matrix- (r + g)
+
+            img_chromatic_rgb = cv2.merge([np.uint8(r*255),
+                                           np.uint8(g*255),
+                                           np.uint8(b*255)]) 
+
+            save_img_cv2(img_chromatic_rgb, "chromatic_rgb_frame")
+            RG_Chroma_plotter(r, g)
 
         return chromaticity
 
@@ -92,10 +109,6 @@ class Tracker:
 
             ## Moments
             red_mask_uint8 = (redbox_frame * 255).astype(np.uint8)
-
-            labeled, num_features = label(redbox_frame)
-            centroids = center_of_mass(redbox_frame, labeled, np.arange(1, num_features + 1))
-
             M = cv2.moments(red_mask_uint8)
             
             # Area from object

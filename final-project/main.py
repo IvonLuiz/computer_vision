@@ -3,8 +3,8 @@ import os
 import cv2
 
 
-video_name1 = "videoos/Video1_husky.mp4"
-video_name2 = "videoos/video2_husky.mp4"
+video_name1 = "videos/Video1_husky.mp4"
+video_name2 = "videos/video2_husky.mp4"
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 

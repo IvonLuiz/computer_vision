@@ -5,8 +5,11 @@ import numpy as np
 from sklearn.cluster import KMeans
 import os
 
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
-## Finding best k to cluster
+
+# -- Finding best k to cluster --
+
 def calculate_WSS(points, kmin, kmax):
   sse = []
   for k in range(kmin, kmax+1):
@@ -45,6 +48,8 @@ def find_elbow_point(wss, kmin, kmax):
     elbow_index = np.argmax(distances)
 
     return x[elbow_index], distances
+
+# -- Creating videos to save --
 
 def create_video(path, frames):
     path = path + ".avi"
@@ -85,6 +90,9 @@ def create_video(path, frames):
     out.release()
     print(f"Video saved on {path}")
 
+
+## -- Plots --
+
 def rgb_splitter(image):
     rgb_list = ['Reds','Greens','Blues']
     fig, ax = plt.subplots(1, 3, figsize=(17,7), sharey = True)
@@ -93,6 +101,7 @@ def rgb_splitter(image):
         ax[i].set_title(rgb_list[i], fontsize = 22)
         ax[i].axis('off')
     fig.tight_layout()
+    plt.savefig(os.path.join(dir_path, "plots/rgb_splitter.png"))
 
 def RG_Chroma_plotter(red, green):
     p_color = [(r, g, 1-r-g) for r,g in zip(red.flatten(), green.flatten())]
@@ -110,7 +119,7 @@ def RG_Chroma_plotter(red, green):
     ax.set_ylabel('Green Channel', fontsize = 20)
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])
-    plt.show()
+    plt.savefig(os.path.join(dir_path, "plots/RG_Chroma.png"))
 
 def plot_elbow(x, y, elbow_k, kmin):
     plt.figure(figsize=(10, 6))
@@ -124,7 +133,7 @@ def plot_elbow(x, y, elbow_k, kmin):
     plt.xticks(x)
     plt.grid(alpha=0.3)
     plt.legend(fontsize=12)
-    plt.show()
+    plt.savefig(os.path.join(dir_path, "plots/elbow.png"))
 
 def plot_clusters(chromaticity, kmeans):
     plt.figure(figsize=(10, 6))
@@ -135,26 +144,16 @@ def plot_clusters(chromaticity, kmeans):
     plt.ylabel("Chromaticity g")
     plt.title("Chromaticity Plane with K-means Clusters")
     plt.legend()
+    plt.savefig(os.path.join(dir_path, "plots/clusters.png"))
 
+def plot_cluster_labels(kmeans, chromaticity, shape):
+    predictions = kmeans.predict(chromaticity)
+    img_labels = predictions.reshape(shape)
 
-# # Changing data type
-# img_norm = (ref_img/255).astype('float32')
-# print(img_norm.min(), img_norm.max())
-# cv2.imshow("normalized", img_norm)
+    plt.figure(figsize=(8, 6), dpi=80)
+    plt.imshow(img_labels)
+    plt.axis('off')
+    plt.savefig(os.path.join(dir_path, "plots/img_labels.png"))
 
-# # Changing brightness
-# img_bright = np.clip(img_norm + 0.25, 0, 1)
-# cv2.imshow("bright", img_bright)
-
-# # Changing contrast
-# img_contrast = np.clip(img_norm * 2, 0, 1)
-# cv2.imshow("contrast", img_contrast)
-
-# # Negative image
-# img_neg = 1 - img_norm
-# cv2.imshow("neg", img_neg)
-
-# # Posterization
-# N = 4
-# img_post = np.floor(img_norm * N) / N
-# cv2.imshow("post", img_post)
+def save_img_cv2(img, name):
+    cv2.imwrite(os.path.join(dir_path, f"plots/{name}.png"), img)
