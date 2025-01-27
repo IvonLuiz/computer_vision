@@ -126,25 +126,35 @@ class Tracker:
                 for i in range(1, len(trajectory)):
                     cv2.line(frame, trajectory[i - 1], trajectory[i], (0, 255, 255), 2)
                 
-                # Central moments and inertia matrix
+                # Central moments and inertia matrix J
                 mu20, mu02, mu11 = M['mu20'], M['mu02'], M['mu11']
                 inertia_matrix = np.array([[mu20, mu11], [mu11, mu02]])
                 
                 # Equivalent elipse
-                eigenvalues, _ = np.linalg.eig(inertia_matrix)
+                eigvals, eigvecs = np.linalg.eig(inertia_matrix)
 
-                a = 4 * np.sqrt(eigenvalues[0] / area)
-                b = 4 * np.sqrt(eigenvalues[1] / area)
-                axes = (int(a / 2), int(b / 2))
+                # Order eigenvalues (λ1 > λ2)
+                idx = np.argsort(eigvals)[::-1]
+                eigvals = eigvals[idx]
+                eigvecs = eigvecs[:, idx]
 
+                # Eigenvalues λ1 e λ2
+                lambda1, lambda2 = eigvals
+                
+                # Axis length
+                a = 4 * np.sqrt(lambda1 / area) # major
+                b = 4 * np.sqrt(lambda2 / area) # minor
+                
                 # Orientation
-                theta_rad = 0.5 * np.arctan2((2 * mu11), (mu20 - mu02))
-                theta_dgr = np.degrees(theta_rad)
+                v_x, v_y = eigvecs[:, 0]
+                theta_dgr = np.degrees(np.arctan2(v_y, v_x))
 
                 if theta_dgr < 0:
                     theta_dgr += 180
                 
                 # Drawing on original frames elipse, centroid and angle orientation
+                axes = (int(a / 2), int(b / 2))
+                
                 cv2.ellipse(
                     frame, centroid, axes, theta_dgr, 0, 360, (255, 0, 0), 2
                 )
