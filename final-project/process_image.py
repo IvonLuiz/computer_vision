@@ -138,10 +138,13 @@ class Tracker:
                 axes = (int(a / 2), int(b / 2))
 
                 # Orientation
-                theta_rad = 0.5 * np.arctan((2 * mu11) / (mu20 - mu02))
+                theta_rad = 0.5 * np.arctan2((2 * mu11), (mu20 - mu02))
                 theta_dgr = np.degrees(theta_rad)
 
-                # 
+                if theta_dgr < 0:
+                    theta_dgr += 180
+                
+                # Drawing on original frames elipse, centroid and angle orientation
                 cv2.ellipse(
                     frame, centroid, axes, theta_dgr, 0, 360, (255, 0, 0), 2
                 )
